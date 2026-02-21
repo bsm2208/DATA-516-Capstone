@@ -1,0 +1,401 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Capstone Project - Event Analytics Pipeline Starter Template'
+
+Parameters:
+  StudentId:
+    Type: String
+    Description: Your student ID (for unique bucket naming)
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: Must contain only lowercase letters, numbers, and hyphens
+  
+  AthenaResultsPrefix:
+    Type: String
+    Default: athena_results/
+    Description: Prefix in the bucket for Athena query results
+
+  GlueRoleName:
+    Type: String
+    Default: LabRole
+    Description: Pre-existing IAM role name to run the Glue crawler (use LabRole; do not create new roles)
+  
+
+Resources:
+  # Source bucket where Lambda writes raw events
+  SourceEventsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'capstone-events-${StudentId}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldEvents
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+  StudentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub uw-${StudentId}-capstone
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true    
+
+  SilverBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub capstone-silver-${StudentId}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true   
+
+  # Lambda function for event generation
+  EventGeneratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'capstone-event-generator-${StudentId}'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Timeout: 900
+      MemorySize: 3008
+      Environment:
+        Variables:
+          SOURCE_BUCKET: !Ref SourceEventsBucket
+      Code:
+        ZipFile: |
+          import json
+          import gzip
+          import os
+          from datetime import datetime, timezone
+          import random
+          import boto3
+
+          s3_client = boto3.client('s3')
+
+          # Product catalog
+          CATEGORIES = ["electronics", "clothing", "home", "books", "sports", "toys"]
+          PRODUCTS = {
+              "electronics": ["p_1001", "p_1002", "p_1003", "p_1004", "p_1005"],
+              "clothing": ["p_2001", "p_2002", "p_2003", "p_2004", "p_2005"],
+              "home": ["p_3001", "p_3002", "p_3003", "p_3004", "p_3005"],
+              "books": ["p_4001", "p_4002", "p_4003", "p_4004", "p_4005"],
+              "sports": ["p_5001", "p_5002", "p_5003", "p_5004", "p_5005"],
+              "toys": ["p_6001", "p_6002", "p_6003", "p_6004", "p_6005"],
+          }
+
+          SEARCH_QUERIES = [
+              "wireless headphones", "running shoes", "coffee maker",
+              "python books", "yoga mat", "laptop stand",
+              "winter jacket", "desk lamp",
+          ]
+
+          def get_random_event_count():
+              return random.randint(500_000, 750_000)
+
+          def generate_product_context():
+              category = random.choice(CATEGORIES)
+              product_id = random.choice(PRODUCTS[category])
+              quantity = random.randint(1, 5)
+              price = round(random.uniform(9.99, 299.99), 2)
+              return {
+                  "product_id": product_id,
+                  "category": category,
+                  "quantity": quantity,
+                  "price": price,
+              }
+
+          def generate_event():
+              timestamp = datetime.now(timezone.utc).isoformat()
+              user_id = f"u_{random.randint(10000, 99999)}"
+              session_id = f"s_{random.randint(10000, 99999)}"
+              event_type = random.choices(
+                  ["page_view", "add_to_cart", "remove_from_cart", "purchase", "search"],
+                  weights=[50, 20, 10, 10, 10],
+                  k=1
+              )[0]
+
+              event = {
+                  "timestamp": timestamp,
+                  "user_id": user_id,
+                  "session_id": session_id,
+                  "event_type": event_type,
+                  "product_id": None,
+                  "quantity": None,
+                  "price": None,
+                  "category": None,
+                  "search_query": None,
+              }
+
+              if event_type == "search":
+                  event["search_query"] = random.choice(SEARCH_QUERIES)
+              else:
+                  product_context = generate_product_context()
+                  event["product_id"] = product_context["product_id"]
+                  event["category"] = product_context["category"]
+                  if event_type in ["add_to_cart", "remove_from_cart", "purchase"]:
+                      event["quantity"] = product_context["quantity"]
+                      event["price"] = product_context["price"]
+
+              return event
+
+          def generate_events_jsonl(count):
+              """Generate events as JSONL string without building full list in memory."""
+              lines = []
+              for _ in range(count):
+                  event = generate_event()
+                  lines.append(json.dumps(event))
+              return '\n'.join(lines)
+
+          def lambda_handler(event, context):
+              bucket_name = os.environ['SOURCE_BUCKET']
+              event_count = get_random_event_count()
+              print(f"Generating {event_count:,} events")
+
+              # Generate events directly as JSONL string
+              jsonl_content = generate_events_jsonl(event_count)
+              print(f"Generated {len(jsonl_content):,} bytes of JSON")
+
+              # Compress
+              compressed_content = gzip.compress(jsonl_content.encode('utf-8'))
+              print(f"Compressed to {len(compressed_content):,} bytes")
+
+              now = datetime.now(timezone.utc)
+              timestamp = now.strftime("%Y%m%d-%H%M%S")
+              s3_key = f"events/year={now.year:04d}/month={now.month:02d}/day={now.day:02d}/hour={now.hour:02d}/minute={now.minute:02d}/events-{timestamp}.jsonl.gz"
+
+              s3_client.put_object(
+                  Bucket=bucket_name,
+                  Key=s3_key,
+                  Body=compressed_content,
+                  ContentType='application/gzip',
+                  ContentEncoding='gzip'
+              )
+
+              print(f"Uploaded {event_count:,} events to s3://{bucket_name}/{s3_key}")
+
+              return {
+                  "statusCode": 200,
+                  "body": json.dumps({
+                      "event_count": event_count,
+                      "s3_key": s3_key,
+                      "bucket": bucket_name
+                  })
+              }
+
+  # EventBridge rule to trigger Lambda every 10 minutes
+  EventGeneratorSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'capstone-event-generator-schedule-${StudentId}'
+      Description: Trigger event generator every 5 minutes
+      ScheduleExpression: 'rate(5 minutes)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt EventGeneratorFunction.Arn
+          Id: EventGeneratorTarget
+
+  # Allow Lambda to write to source bucket
+  EventGeneratorFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EventGeneratorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventGeneratorSchedule.Arn
+
+  # Lambda function to empty bucket on stack deletion
+  BucketCleanupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'capstone-bucket-cleanup-${StudentId}'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+
+          def handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      bucket_name = event['ResourceProperties']['BucketName']
+                      print(f"Emptying bucket: {bucket_name}")
+                      s3 = boto3.resource('s3')
+                      bucket = s3.Bucket(bucket_name)
+                      # Delete all objects including versions
+                      bucket.object_versions.all().delete()
+                      print(f"Bucket {bucket_name} emptied successfully")
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom resource to trigger bucket cleanup on stack deletion
+  BucketCleanup:
+    Type: Custom::BucketCleanup
+    Properties:
+      ServiceToken: !GetAtt BucketCleanupFunction.Arn
+      BucketName: !Ref SourceEventsBucket
+
+  #create Glue database    
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub de_${StudentId}_db  
+  
+  #set up Athena workgroup
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub de-${StudentId}-wg
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: false
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${StudentBucket}/${AthenaResultsPrefix}
+
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub de-${StudentId}-crawler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${GlueRoleName}
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://${SourceEventsBucket}/events/
+      SchemaChangePolicy:
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+        UpdateBehavior: UPDATE_IN_DATABASE
+    
+
+
+    #
+#   EventsTable:
+#     Type: AWS::Glue::Table
+#     Properties:
+#       CatalogId: !Ref AWS::AccountId
+#       DatabaseName: !Ref GlueDatabase
+#       TableInput:
+#         Name: e-commerce events
+#         Description: Manually defined table for events data (same data as crawler-discovered table)
+#         TableType: EXTERNAL_TABLE
+#         Parameters:
+#           EXTERNAL: 'TRUE'
+#           'classification': 'parquet'
+# #           'compressionType': 'gzip'
+#           'typeOfData': 'file'
+# #           'skip.header.line.count': '1'  # CSV has header row
+#         PartitionKeys:  
+#           - Name: year
+#             Type: int
+#           - Name: month
+#             Type: int
+#           - Name: day
+#             Type: int
+#           - Name: hour
+#             Type: int
+#         StorageDescriptor:
+#           Columns:  
+#             - Name: timestamp
+#               Type: string
+#             - Name: user_id
+#               Type: string
+#             - Name: session_id
+#               Type: string
+#             - Name: event_type
+#               Type: string
+#             - Name: product_id
+#               Type: string  
+#             - Name: quantity
+#               Type: int
+#             - Name: price
+#               Type: double
+#             - Name: category
+#               Type: string
+#             - Name: search_query
+#               Type: string
+            
+#           Location: !Sub 's3://${SourceEventsBucket}/events/'  # SAME location as crawler!
+#           InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+#           OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+#           Compressed: false  
+#           SerdeInfo:  # Serializer/Deserializer configuration for CSV parsing
+#             SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+#             Parameters:
+#               'serialization.format': '1'  
+
+Outputs:
+  SourceBucketName:
+    Description: S3 bucket containing raw event data
+    Value: !Ref SourceEventsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-SourceBucket'
+
+  SourceDataPrefix:
+    Description: S3 prefix where events are written
+    Value: 'events/'
+    Export:
+      Name: !Sub '${AWS::StackName}-SourcePrefix'
+
+  SourceBucketArn:
+    Description: ARN of source bucket
+    Value: !GetAtt SourceEventsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SourceBucketArn'
+
+  EventGeneratorSchedule:
+    Description: EventBridge rule triggering event generation
+    Value: !Ref EventGeneratorSchedule
+    Export:
+      Name: !Sub '${AWS::StackName}-Schedule'
+
+  LambdaFunctionName:
+    Description: Name of event generator Lambda function
+    Value: !Ref EventGeneratorFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunction'
+
+  StudentBucketName:
+    Description: Name of the S3 bucket created for this capstone project
+    Value: !Ref StudentBucket
+    Export:
+      Name: !Sub de-${StudentId}-StudentBucketName
+  
+  SilverBucketName:
+    Description: Name of the S3 bucket created for this capstone project
+    Value: !Ref SilverBucket
+    Export:
+      Name: !Sub de-${StudentId}-SilverBucketName
+
+
