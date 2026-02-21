@@ -31,27 +31,29 @@ The technical requirements are that I extend the CloudFormation template to add 
 
 
 ### Design Choices:
-•	Transform raw data to Parquet format 
+#### 1.	Transform raw data to Parquet format 
 Parquet, which is a columnar storage format, is excellent for analytical queries since it enables compression by column and projection and predicate pushdown. Compression by column reduces disk space and I/O query processing because homogenous values compress better, and projection pushdown enables the query to read only selected columns. 
 
 Predicate pushdown uses min and max values from data block predicates to skip row groups. As for alternatives, the JSON lines format (Bronze layer) can technically be kept since Athena allows JSON-data querying. However, as 500-750k events are being created every five minutes, it is an expensive and inefficient choice because rows are stored contiguously, and the entire rows must be scanned for query processing even when the query only requires a few columns. ORC (Optimized Row Columnar) could be used; it is often results in smaller files than Parquet format and its indexes can expedite processing. 
 
 For my business objective, I believe Parquet’s efficient data compression and encoding make it highly suitable for processing fast-accumulating data. Parquet format and partitions enable fewer bytes to be scanned, which reduces costs for services that charge by data scanned, such as Athena. For compression, I will use Snappy because it enables high compression and decompression speed.
 
-•	Partitioning 
+#### 2.	Partitioning 
 The event files use Hive-style partitioning as follows: 
 
 events/year=YYYY/month=MM/day=DD/hour=HH/minute=mm/events-{timestamp}.jsonl.gz
 
 The required queries do not need the data to be partitioned by minute. So, I will use year, month, day and hour as partition keys when defining the Glue Job. This involves deriving partitions using the Pyspark SQL functions year, month, dayofmonth and hour from the timestamp in the ETL script. 
 
-•	Athena vs. Redshift
-The EventBridge scheduler and Lambda are defined in the provided CloudFormation. I will be adding my pipeline resources to the template and run ad-hoc queries. Athena allows users to run interactive ad hoc queries directly on data in S3, so I believe Athena is a better choice for my project. Since Athena is serverless, users do not need to set up infrastructure. Additionally, the five SQL queries are not complex to the extent that they require joining data from multiple resources (which Redshift better supports). Besides, Athena will give the business peace of mind because it has a pay-per-query model, whereas Redshift employs a cluster-based pricing model which can add up costs depending on how long the cluster needs to be maintained. With that said, the business may wish to reevaluate its options if it needs to run frequent queries in the future (storage versus query volume). 
+#### 3.	Athena vs. Redshift
+The EventBridge scheduler and Lambda are defined in the provided CloudFormation. I will be adding my pipeline resources to the template and run ad-hoc queries. Athena allows users to run interactive ad hoc queries directly on data in S3, so I believe Athena is a better choice for my project. Since Athena is serverless, users do not need to set up infrastructure. 
 
-•	AWS Glue bookmark
+Additionally, the five SQL queries are not complex to the extent that they require joining data from multiple resources (which Redshift better supports). Besides, Athena will give the business peace of mind because it has a pay-per-query model, whereas Redshift employs a cluster-based pricing model which can add up costs depending on how long the cluster needs to be maintained. With that said, the business may wish to reevaluate its options if it needs to run frequent queries in the future (storage versus query volume). 
+
+#### 4.	AWS Glue bookmark
 As data will be flowing in every five minutes, I will use the Glue job bookmark feature to track data that has already been processed and prevent reprocessing. Another approach is to make it event-driven (S3 → EventBridge → Glue). The advantage is that the business can enjoy near-real time, decoupled architecture, which allows the rest of the services to continue to run even if one service experiences a failure. However, it involves more set up and may drive up costs. 
 
-•	Silver layer vs. Gold layer
+#### 5.	Silver layer vs. Gold layer
 The silver layer is best for transforming raw JSON lines files into a clean, partitioned Parquet dataset optimized for production-grade analytics. The purpose of the analytical dataset is to gain insight into the conversion funnel, hourly revenue, top 10 products by view count, category performance and user activity. Since these queries do not require complex joins or business-ready aggregates, the silver layer is the most cost-efficient and appropriate option for this data pipeline.
 
 ## Pipeline
