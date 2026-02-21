@@ -78,6 +78,7 @@ I ran the explain function directly in Athena. The following are screenshots of 
 
 <img width="175" height="114" alt="image" src="https://github.com/user-attachments/assets/85e5cb65-a6fb-44bc-9c43-03abdafacede" />
 
+
 <img width="468" height="39" alt="image" src="https://github.com/user-attachments/assets/e6fe2332-453b-4418-8753-a7701b3b50f8" />
 
 The actual query took 1.452 seconds and scanned 14.37MB.
@@ -88,6 +89,7 @@ The actual query took 1.452 seconds and scanned 14.37MB.
 The following screenshots provide evidence of predicate/projection pushdown.
 
 <img width="329" height="179" alt="image" src="https://github.com/user-attachments/assets/142b75df-3cfe-434b-96c7-a94b9af065a3" />
+
 
 <img width="468" height="49" alt="image" src="https://github.com/user-attachments/assets/0bfa0be6-7175-4b0e-b965-ea2ba1235299" />
 
