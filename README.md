@@ -30,7 +30,7 @@ The technical requirements are that I extend the CloudFormation template to add 
 5.	Run the five analytical queries
 
 
-### Design Choices:
+## Design Choices:
 #### 1.	Transform raw data to Parquet format 
 Parquet, which is a columnar storage format, is excellent for analytical queries since it enables compression by column and projection and predicate pushdown. Compression by column reduces disk space and I/O query processing because homogenous values compress better, and projection pushdown enables the query to read only selected columns. 
 
