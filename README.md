@@ -6,11 +6,14 @@ Data 512, Fall 2025
 
 ### Scenario: 
 As a data engineer at an e-commerce company, my task is to build a production-grade analytics pipeline for e-commerce event data generated at a rate of 500K-750k every 5 minutes and a reliable analytical dataset that can be used for analysis and experiments. The data files are in gzipped JSON line format and use Hive-style partitioning for automatic Glue/Athena partition discovery.
+
 The technical requirements are that I extend the CloudFormation template to add my pipeline infrastructure, handle incremental streams of data, and support the five required queries. The purpose of the queries is to help the business understand the conversion funnel, hourly revenue, top 10 products, category performance and user activity. 
 
 ## Overall plan:
 •	Extend the CloudFormation template to include my pipeline infrastructure
+
     -	Add one bucket dedicated to the transformed analytical dataset and one bucket for the CloudFormation template, ETL script and SQL queries 
+    
     -	Create a Glue database, Athena workgroup and Glue crawler. A workgroup enables users to isolate queries, assign a specific query results location and see query-level metrics. The Glue crawler is included as an optional resource. I will be creating an Athena table pointing to the Parquet outputs using Data Definition Language(DDL) to explicitly define the partition structure and schema. 
     -	Set parameters for the Athena query results prefix and the Glue role name (LabRole) 	
     -	Finally, declare the dedicated two bucket names in the outputs section
