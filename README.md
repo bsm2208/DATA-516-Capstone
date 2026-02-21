@@ -65,8 +65,10 @@ The silver layer is best for transforming raw JSON lines files into a clean, par
 
 •	Athena queries the analytical bucket using the metadata from the Glue data catalog.
 
+<p align="center">
 <img width="468" height="361" alt="image" src="https://github.com/user-attachments/assets/6c9f2e9b-f0f2-4d24-abe2-064697fc02d1" />
-                
+</p>
+
 ## Validation:
 After deploying the updated CloudFormation template, I allowed EventBridge to run for approximately one hour to collect an hour worth of raw events data. Then I created and executed the Glue job, disabled EventBridge to prevent additional ingestion, ran MSCK REPAIR TABLE Athena to add the new partitions. In order to validate the old data was not reprocessed, I ran the command SELECT COUNT(*), which returned 11,993,605.
 
@@ -76,61 +78,81 @@ Next, I enabled EventBridge again for around 15 minutes and took the same step a
 #### Query 1: Conversion Funnel
 I ran the explain function directly in Athena. The following are screenshots of the relevant parts of the query plan show evidence of partition pruning and projection/predicate pushdown. 
 
+<p align="center">
 <img width="175" height="114" alt="image" src="https://github.com/user-attachments/assets/85e5cb65-a6fb-44bc-9c43-03abdafacede" />
+</p>
 
-
+<p align="center">
 <img width="468" height="39" alt="image" src="https://github.com/user-attachments/assets/e6fe2332-453b-4418-8753-a7701b3b50f8" />
+</p>
 
 The actual query took 1.452 seconds and scanned 14.37MB.
 
+<p align="center">
 <img width="251" height="265" alt="image" src="https://github.com/user-attachments/assets/66d93d35-7cad-47b0-abc2-38d30e7271b0" />
+</p>
 
 #### Query 2: Hourly Revenue
 The following screenshots provide evidence of predicate/projection pushdown.
 
+<p align="center">
 <img width="329" height="179" alt="image" src="https://github.com/user-attachments/assets/142b75df-3cfe-434b-96c7-a94b9af065a3" />
+</p>
 
-
+<p align="center">
 <img width="468" height="49" alt="image" src="https://github.com/user-attachments/assets/0bfa0be6-7175-4b0e-b965-ea2ba1235299" />
+</p>
 
 The actual query took 1.613 seconds and scanned 36.99MB.
 
+<p align="center">
 <img width="313" height="60" alt="image" src="https://github.com/user-attachments/assets/532d3f69-9bb0-4193-af9e-f49054ddbc2c" />
-
+</p>
 
 #### Query 3 : Top 10 Products
 Its query plan also shows evidence of projection/predicate pushdown as follows:
 
+<p align="center">
 <img width="468" height="38" alt="image" src="https://github.com/user-attachments/assets/d3587704-7a99-4d23-b957-4dbcb55fb449" />
+</p>
 
 The query took 900ms and scanned 14.37MB.
 
+<p align="center">
 <img width="293" height="247" alt="image" src="https://github.com/user-attachments/assets/6694d4c1-669a-4ebd-beda-a36dce98e1db" />
-
+</p>
 
 #### Query 4 : Category Performance
 There appears to be no evidence of predicate pushdown. However, I can find evidence of projection pushdown and partition pruning.
   
-
+<p align="center">
 <img width="256" height="140" alt="image" src="https://github.com/user-attachments/assets/19d5934c-f1a6-4bd4-b19c-749564843c62" />
+</p>
 
+<p align="center">
 <img width="463" height="31" alt="image" src="https://github.com/user-attachments/assets/eff0029a-d4b9-4e8e-b95f-e433383365cc" />
+</p>
 
 The query took 1.152 seconds and scanned 6.33MB
 
+<p align="center">
 <img width="416" height="181" alt="image" src="https://github.com/user-attachments/assets/9c639c2c-b550-41cb-9336-e4a014d50eba" />
+</p>
 
 #### Query 5: User Activity
 Its query plan also shows evidence of projection pushdown and partition pruning only. 
 
+<p align="center">
 <img width="468" height="149" alt="image" src="https://github.com/user-attachments/assets/ec663a86-0d6a-4fc9-8a1c-7854785fc403" />
+</p>
 
 This query took 2.191 seconds and scanned 149.07MB.
 
+<p align="center">
 <img width="468" height="45" alt="image" src="https://github.com/user-attachments/assets/53bc03dc-790c-4064-bebf-d62af20291ee" />
+</p>
 
-
-I believe queries 4 and 5 did not have predicate pushdown due to the absence of a where clause.
+I believe queries 4 and 5 did not have predicate pushdown due to the absence of a WHERE clause.
 All five queries ran efficiently, under 3 seconds. I saw evidence of predicate and projection pushdown and partition pruning, which indicates that the Parquet format reduces scan size. In terms of scalability, while the queries performed well without errors, it would be prudent to continuously monitor performance and consider further approaches to achieve efficiency and reduce costs. 
 
 ## Reflection:
