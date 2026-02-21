@@ -10,8 +10,7 @@ As a data engineer at an e-commerce company, my task is to build a production-gr
 The technical requirements are that I extend the CloudFormation template to add my pipeline infrastructure, handle incremental streams of data, and support the five required queries. The purpose of the queries is to help the business understand the conversion funnel, hourly revenue, top 10 products, category performance and user activity. 
 
 ## Overall plan:
-•	Extend the CloudFormation template to include my pipeline infrastructure
-
+1. Extend the CloudFormation template to include my pipeline infrastructure
     -	Add one bucket dedicated to the transformed analytical dataset and one bucket for the CloudFormation template, ETL script and SQL queries 
     
     -	Create a Glue database, Athena workgroup and Glue crawler. A workgroup enables users to isolate queries, assign a specific query results location and see query-level metrics. The Glue crawler is included as an optional resource. I will be creating an Athena table pointing to the Parquet outputs using Data Definition Language(DDL) to explicitly define the partition structure and schema. 
