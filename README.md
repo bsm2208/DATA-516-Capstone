@@ -81,6 +81,7 @@ I ran the explain function directly in Athena. The following are screenshots of 
 <img width="468" height="39" alt="image" src="https://github.com/user-attachments/assets/e6fe2332-453b-4418-8753-a7701b3b50f8" />
 
 The actual query took 1.452 seconds and scanned 14.37MB.
+
 <img width="251" height="265" alt="image" src="https://github.com/user-attachments/assets/66d93d35-7cad-47b0-abc2-38d30e7271b0" />
 
 #### Query 2: Hourly Revenue
@@ -91,6 +92,7 @@ The following screenshots provide evidence of predicate/projection pushdown.
 <img width="468" height="49" alt="image" src="https://github.com/user-attachments/assets/0bfa0be6-7175-4b0e-b965-ea2ba1235299" />
 
 The actual query took 1.613 seconds and scanned 36.99MB.
+
 <img width="313" height="60" alt="image" src="https://github.com/user-attachments/assets/532d3f69-9bb0-4193-af9e-f49054ddbc2c" />
 
 
@@ -100,6 +102,7 @@ Its query plan also shows evidence of projection/predicate pushdown as follows:
 <img width="468" height="38" alt="image" src="https://github.com/user-attachments/assets/d3587704-7a99-4d23-b957-4dbcb55fb449" />
 
 The query took 900ms and scanned 14.37MB.
+
 <img width="293" height="247" alt="image" src="https://github.com/user-attachments/assets/6694d4c1-669a-4ebd-beda-a36dce98e1db" />
 
 
@@ -112,6 +115,7 @@ There appears to be no evidence of predicate pushdown. However, I can find evide
 <img width="463" height="31" alt="image" src="https://github.com/user-attachments/assets/eff0029a-d4b9-4e8e-b95f-e433383365cc" />
 
 The query took 1.152 seconds and scanned 6.33MB
+
 <img width="416" height="181" alt="image" src="https://github.com/user-attachments/assets/9c639c2c-b550-41cb-9336-e4a014d50eba" />
 
 #### Query 5: User Activity
