@@ -72,7 +72,7 @@ The silver layer is best for transforming raw JSON lines files into a clean, par
 ## Validation:
 After deploying the updated CloudFormation template, I allowed EventBridge to run for approximately one hour to collect an hour worth of raw events data. Then I created and executed the Glue job, disabled EventBridge to prevent additional ingestion, ran MSCK REPAIR TABLE Athena to add the new partitions. In order to validate the old data was not reprocessed, I ran the command SELECT COUNT(*), which returned 11,993,605.
 
-Next, I enabled EventBridge again for around 15 minutes and took the same step above to get a second batch of data. Then, I ran the validation query again, and it returned 13,956,360. Since this value is less than double the initial count, it confirms that the Glue job bookmark successfully processed the new files without reprocessing the already-processed old files. I also checked and saw that the new partitions corresponded to the hour in which second round of ingestion occurred. 
+Next, I enabled EventBridge again for around 15 minutes and took the same step above to get a second batch of data. Then, I ran the validation query again, and it returned 13,956,360. Since this value is less than double the initial count, it confirms that the Glue job bookmark successfully processed the new files without reprocessing the already-processed old files. I also checked and saw that the new partitions corresponded to the hour in which the second round of ingestion occurred. 
 
 ## Required Queries and Performance:
 #### Query 1: Conversion Funnel
