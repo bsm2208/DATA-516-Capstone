@@ -16,7 +16,7 @@ The technical requirements are that I extend the CloudFormation template to add 
     -	Create a Glue database, Athena workgroup and Glue crawler. A workgroup enables users to isolate queries, assign a specific query results location and see query-level metrics. The Glue crawler is included as an optional resource. I will be creating an Athena table pointing to the Parquet outputs using Data Definition Language(DDL) to explicitly define the partition structure and schema. 
     -	Set parameters for the Athena query results prefix and the Glue role name (LabRole) 	
     -	Finally, declare the dedicated two bucket names in the outputs section
-•	Using a custom ETL script, create and run a Glue job via the AWS console.
+2.	Using a custom ETL script, create and run a Glue job via the AWS console.
     -	Using built-in Spark functions under the hood, the Glue job will extract and transform gzipped JSON lines files to parquet format and write them to the dedicated bucket defined in the ETL script. 
     -	The bookmark function will be enabled to handle incremental data arriving every five minutes. With this function, Glue job will process new data without processing data that has already been processed. 
     -	Writing a proper ETL script is essential for a successful Glue Run. 
@@ -24,8 +24,8 @@ The technical requirements are that I extend the CloudFormation template to add 
         o	Include the transformation_ctx parameter, which is used for indexing the bookmark key to search for the bookmark state. Without this parameter, the bookmarks are not enabled for the dynamic frame
         o	Convert to Spark DataFrame for transformations and convert back to Dynamic Frame before writing
         o	I used the configuration: Glue 4.0, worker type G.1X, two workers and max concurrency of 1. G.1X is a cost-efficient and scalable option for data transformations and queries. 
-•	After the Glue job finishes running, run MSCK REPAIR TABLE in Athena to look for new partitions and verify the new partitions have been added
-•	Run the five analytical queries
+3.	After the Glue job finishes running, run MSCK REPAIR TABLE in Athena to look for new partitions and verify the new partitions have been added
+4.	Run the five analytical queries
 
 
 ### Design Choices:
