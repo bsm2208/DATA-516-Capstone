@@ -4,7 +4,7 @@
 Jennifer Kim
 Data 512, Fall 2025
 
-### Scenario: 
+## Scenario: 
 As a data engineer at an e-commerce company, my task is to build a production-grade analytics pipeline for e-commerce event data generated at a rate of 500K-750k every 5 minutes and a reliable analytical dataset that can be used for analysis and experiments. The data files are in gzipped JSON line format and use Hive-style partitioning for automatic Glue/Athena partition discovery.
 
 The technical requirements are that I extend the CloudFormation template to add my pipeline infrastructure, handle incremental streams of data, and support the five required queries. The purpose of the queries is to help the business understand the conversion funnel, hourly revenue, top 10 products, category performance and user activity. 
@@ -64,12 +64,12 @@ The silver layer is best for transforming raw JSON lines files into a clean, par
 
 <img width="468" height="361" alt="image" src="https://github.com/user-attachments/assets/6c9f2e9b-f0f2-4d24-abe2-064697fc02d1" />
                 
-Validation:
+## Validation:
 After deploying the updated CloudFormation template, I allowed EventBridge to run for approximately one hour to collect an hour worth of raw events data. Then I created and executed the Glue job, disabled EventBridge to prevent additional ingestion, ran MSCK REPAIR TABLE Athena to add the new partitions. In order to validate the old data was not reprocessed, I ran the command SELECT COUNT(*), which returned 11,993,605.
 Next, I enabled EventBridge again for around 15 minutes and took the same step above to get a second batch of data. Then, I ran the validation query again, and it returned 13,956,360. Since this value is less than double the initial count, it confirms that the Glue job bookmark successfully processed the new files without reprocessing the already-processed old files. I also checked and saw that the new partitions corresponded to the hour in which second round of ingestion occurred. 
 
-Required Queries and Performance:
-Query 1: Conversion Funnel
+## Required Queries and Performance:
+#### Query 1: Conversion Funnel
 I ran the explain function directly in Athena. The following are screenshots of the relevant parts of the query plan show evidence of partition pruning and projection/predicate pushdown. 
 
  ![alt text](image-1.png)
@@ -78,7 +78,7 @@ I ran the explain function directly in Athena. The following are screenshots of 
 The actual query took 1.452 seconds and scanned 14.37MB.
  ![alt text](image-3.png)
 
-Query 2: Hourly Revenue
+#### Query 2: Hourly Revenue
 The following screenshots provide evidence of predicate/projection pushdown.
 
 ![alt text](image-4.png)
@@ -86,7 +86,7 @@ The following screenshots provide evidence of predicate/projection pushdown.
 The actual query took 1.613 seconds and scanned 36.99MB.
 ![alt text](image-6.png) 
 
-Query 3 : Top 10 Products
+#### Query 3 : Top 10 Products
 Its query plan also shows evidence of projection/predicate pushdown as follows:
 
  ![alt text](image-7.png)
@@ -94,7 +94,7 @@ Its query plan also shows evidence of projection/predicate pushdown as follows:
 The query took 900ms and scanned 14.37MB.
  ![alt text](image-8.png)
 
-Query 4 : Category Performance
+#### Query 4 : Category Performance
 There appears to be no evidence of predicate pushdown. However, I can find evidence of projection pushdown and partition pruning.
   
 The query took 1.152 seconds and scanned 6.33MB
@@ -102,7 +102,7 @@ The query took 1.152 seconds and scanned 6.33MB
 
 ![alt text](image-10.png) 
 
-Query 5: User Activity
+#### Query 5: User Activity
 Its query plan also shows evidence of projection pushdown and partition pruning only. 
 
 ![alt text](image-11.png)
