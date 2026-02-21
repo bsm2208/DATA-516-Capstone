@@ -4,7 +4,7 @@
 Jennifer Kim
 Data 512, Fall 2025
 
-### Scenario: 
+## Scenario: 
 As a data engineer at an e-commerce company, my task is to build a production-grade analytics pipeline for e-commerce event data generated at a rate of 500K-750k every 5 minutes and a reliable analytical dataset that can be used for analysis and experiments. The data files are in gzipped JSON line format and use Hive-style partitioning for automatic Glue/Athena partition discovery.
 The technical requirements are that I extend the CloudFormation template to add my pipeline infrastructure, handle incremental streams of data, and support the five required queries. The purpose of the queries is to help the business understand the conversion funnel, hourly revenue, top 10 products, category performance and user activity. 
 
@@ -26,7 +26,7 @@ The technical requirements are that I extend the CloudFormation template to add 
 •	Run the five analytical queries
 
 
-### Design Choices:
+## Design Choices:
 •	Transform raw data to Parquet format 
 Parquet, which is a columnar storage format, is excellent for analytical queries since it enables compression by column and projection and predicate pushdown. Compression by column reduces disk space and I/O query processing because homogenous values compress better, and projection pushdown enables the query to read only selected columns. Predicate pushdown uses min and max values from data block predicates to skip row groups. As for alternatives, the JSON lines format (Bronze layer) can technically be kept since Athena allows JSON-data querying. However, as 500-750k events are being created every five minutes, it is an expensive and inefficient choice because rows are stored contiguously, and the entire rows must be scanned for query processing even when the query only requires a few columns. ORC (Optimized Row Columnar) could be used; it is often results in smaller files than Parquet format and its indexes can expedite processing. For my business objective, I believe Parquet’s efficient data compression and encoding make it highly suitable for processing fast-accumulating data. Parquet format and partitions enable fewer bytes to be scanned, which reduces costs for services that charge by data scanned, such as Athena. For compression, I will use Snappy because it enables high compression and decompression speed.
 
@@ -52,7 +52,7 @@ Data Pipeline
 •	The transformed Parquet files are stored in the analytical S3 bucket (silver layer)
 •	Athena queries the analytical bucket using the metadata from the Glue data catalog.
 
-![alt text](image.png)
+![alt text](images/image.png)
 
                 
 Validation:
@@ -63,44 +63,44 @@ Required Queries and Performance:
 Query 1: Conversion Funnel
 I ran the explain function directly in Athena. The following are screenshots of the relevant parts of the query plan show evidence of partition pruning and projection/predicate pushdown. 
 
- ![alt text](image-1.png)
+ ![alt text](images/image-1.png)
 
- ![alt text](image-2.png)
+ ![alt text](images/image-2.png)
 The actual query took 1.452 seconds and scanned 14.37MB.
- ![alt text](image-3.png)
+ ![alt text](images/image-3.png)
 
 Query 2: Hourly Revenue
 The following screenshots provide evidence of predicate/projection pushdown.
 
-![alt text](image-4.png)
-![alt text](image-5.png)
+![alt text](images/image-4.png)
+![alt text](images/image-5.png)
 The actual query took 1.613 seconds and scanned 36.99MB.
-![alt text](image-6.png) 
+![alt text](images/image-6.png) 
 
 Query 3 : Top 10 Products
 Its query plan also shows evidence of projection/predicate pushdown as follows:
 
- ![alt text](image-7.png)
+ ![alt text](images/image-7.png)
 
 The query took 900ms and scanned 14.37MB.
- ![alt text](image-8.png)
+ ![alt text](images/image-8.png)
 
 Query 4 : Category Performance
 There appears to be no evidence of predicate pushdown. However, I can find evidence of projection pushdown and partition pruning.
   
 The query took 1.152 seconds and scanned 6.33MB
-![alt text](image-9.png) 
+![alt text](images/image-9.png) 
 
-![alt text](image-10.png) 
+![alt text](images/image-10.png) 
 
 Query 5: User Activity
 Its query plan also shows evidence of projection pushdown and partition pruning only. 
 
-![alt text](image-11.png)
+![alt text](images/image-11.png)
 
 This query took 2.191 seconds and scanned 149.07MB.
 
-![alt text](image-12.png)
+![alt text](images/image-12.png)
 
 I believe queries 4 and 5 did not have predicate pushdown due to the absence of a where clause.
 All five queries ran efficiently, under 3 seconds. I saw evidence of predicate and projection pushdown and partition pruning, which indicates that the Parquet format reduces scan size. In terms of scalability, while the queries performed well without errors, it would be prudent to continuously monitor performance and consider further approaches to achieve efficiency and reduce costs. 
